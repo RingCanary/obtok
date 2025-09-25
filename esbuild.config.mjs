@@ -1,11 +1,32 @@
-// esbuild.config.mjs
-import { cpSync, rmSync, mkdirSync } from "fs";
+import esbuild from "esbuild";
+import { cpSync, mkdirSync, rmSync } from "fs";
 import { join } from "path";
-rmSync("dist", { recursive: true, force: true });
-mkdirSync("dist/public/bpe", { recursive: true });
 
-cpSync("manifest.json", "dist/manifest.json");
-cpSync("node_modules/tiktoken/lite/tiktoken_bg.wasm", "dist/public/tiktoken_bg.wasm");
-for (const f of ["cl100k_base.json","o200k_base.json","p50k_base.json"]) {
-  cpSync(`node_modules/tiktoken/encoders/${f}`, join("dist/public/bpe", f));
+const outdir = "dist";
+rmSync(outdir, { recursive: true, force: true });
+mkdirSync(join(outdir, "public", "bpe"), { recursive: true });
+
+cpSync("manifest.json", join(outdir, "manifest.json"));
+cpSync("public", join(outdir, "public"), { recursive: true });
+
+const watchMode = process.argv.includes("--watch");
+
+const buildOptions = {
+  entryPoints: ["src/main.ts"],
+  bundle: true,
+  platform: "browser",
+  format: "cjs",
+  target: "es2020",
+  outfile: join(outdir, "main.js"),
+  sourcemap: watchMode,
+  logLevel: "info",
+  external: ["obsidian"],
+};
+
+if (watchMode) {
+  const ctx = await esbuild.context(buildOptions);
+  await ctx.watch();
+  console.log("esbuild watching...");
+} else {
+  await esbuild.build(buildOptions);
 }

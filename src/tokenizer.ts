@@ -1,39 +1,58 @@
-// tokenizer.ts
 import { init, Tiktoken } from "tiktoken/lite/init";
 
-type EncoderName = "cl100k_base" | "o200k_base" | "p50k_base";
+type EncodingName = "o200k_base" | "cl100k_base" | "p50k_base";
 
-let inited = false;
-const encoders: Record<EncoderName, Tiktoken | null> = {
-  cl100k_base: null,
-  o200k_base: null,
-  p50k_base: null,
-};
-
-async function loadJSON(name: EncoderName) {
-  const res = await fetch(`public/bpe/${name}.json`);
-  if (!res.ok) throw new Error(`Failed to load ${name}.json`);
-  return (await res.json()) as {
-    bpe_ranks: Record<string, number>;
-    special_tokens: Record<string, number>;
-    pat_str: string;
-  };
+interface EncoderConfig {
+  bpe_ranks: string;
+  pat_str: string;
+  special_tokens: Record<string, number>;
 }
 
-export async function getEncoder(name: EncoderName) {
-  if (!inited) {
-    const wasm = await fetch("public/tiktoken_bg.wasm").then(r => r.arrayBuffer());
-    await init(wasm);
-    inited = true;
+type AssetResolver = (relativePath: string) => string;
+
+let resolveAssetPath: AssetResolver = (path) => `public/${path}`;
+let initPromise: Promise<void> | null = null;
+const encoderPromises: Partial<Record<EncodingName, Promise<Tiktoken>>> = {};
+
+export function setTokenizerAssetResolver(resolver?: AssetResolver): void {
+  resolveAssetPath = resolver ?? ((path) => `public/${path}`);
+  initPromise = null;
+  for (const key of Object.keys(encoderPromises) as EncodingName[]) {
+    delete encoderPromises[key];
   }
-  if (!encoders[name]) {
-    const { bpe_ranks, special_tokens, pat_str } = await loadJSON(name);
-    encoders[name] = new Tiktoken(bpe_ranks, special_tokens, pat_str);
-  }
-  return encoders[name]!;
 }
 
-export async function countTokens(text: string, name: EncoderName) {
-  const enc = await getEncoder(name);
-  return enc.encode(text).length;
+async function ensureInit(): Promise<void> {
+  if (!initPromise) {
+    initPromise = (async () => {
+      const response = await fetch(resolveAssetPath("tiktoken_bg.wasm"));
+      if (!response.ok) throw new Error("Failed to load tiktoken_bg.wasm");
+      const wasmBytes = await response.arrayBuffer();
+      await init((imports) => WebAssembly.instantiate(wasmBytes, imports));
+    })();
+  }
+  await initPromise;
+}
+
+async function loadEncoderConfig(name: EncodingName): Promise<EncoderConfig> {
+  const response = await fetch(resolveAssetPath(`bpe/${name}.json`));
+  if (!response.ok) throw new Error(`Failed to load encoder: ${name}`);
+  return (await response.json()) as EncoderConfig;
+}
+
+async function getEncoder(name: EncodingName): Promise<Tiktoken> {
+  await ensureInit();
+  if (!encoderPromises[name]) {
+    encoderPromises[name] = (async () => {
+      const { bpe_ranks, special_tokens, pat_str } = await loadEncoderConfig(name);
+      return new Tiktoken(bpe_ranks, special_tokens, pat_str);
+    })();
+  }
+  return encoderPromises[name]!;
+}
+
+export async function countTokens(text: string, name: EncodingName): Promise<number> {
+  if (!text) return 0;
+  const encoder = await getEncoder(name);
+  return encoder.encode(text).length;
 }

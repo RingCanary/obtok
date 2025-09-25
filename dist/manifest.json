@@ -5,6 +5,5 @@
   "minAppVersion": "1.5.0",
   "description": "Shows LLM token counts (tiktoken) for the active note and selection in the status bar.",
   "author": "You",
-  "authorUrl": "https://example.com",
   "isDesktopOnly": false
 }
