@@ -1,0 +1,17 @@
+{
+  "name": "obtok",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "node esbuild.config.mjs",
+    "dev": "node esbuild.config.mjs --watch",
+    "zip": "npm run build && cd dist && zip -r ../llm-tokens.zip *"
+  },
+  "devDependencies": {
+    "esbuild": "^0.23.0",
+    "obsidian": "^1.5.0"
+  },
+  "dependencies": {
+    "tiktoken": "^1.0.22"
+  }
+}
