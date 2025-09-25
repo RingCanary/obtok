@@ -1,9 +1,0 @@
-{
-  "id": "llm-tokens",
-  "name": "LLM Tokens (Status Bar)",
-  "version": "0.1.0",
-  "minAppVersion": "1.5.0",
-  "description": "Shows LLM token counts (tiktoken) for the active note and selection in the status bar.",
-  "author": "You",
-  "isDesktopOnly": false
-}
